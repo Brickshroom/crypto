@@ -1,0 +1,197 @@
+#include <iostream>
+#include <string>
+#include <list>
+#include <vector>
+ 
+class infnum{
+private:
+    int base = 64;
+    std::list<int> num = {};
+public:
+    infnum(std::list<int>&& a) : num(std::move(a)) {};
+    void append(int t) {
+        //num.push_front(t);
+        num.push_front(t);
+    }
+    int len() {
+        return num.size();
+    }
+    std::list<int>::const_iterator begin() {
+        return num.cbegin();
+    }
+    std::list<int>::const_iterator end() {
+        return num.cend();
+    }
+    std::pair<std::list<int>, uint64_t> operator/(uint64_t p) {
+        std::list<int> newnum;
+        uint64_t r = 0;
+        while (num.size() != 0) {
+            r = r * base + num.front();
+            num.pop_front();
+            newnum.push_back(r / p);
+            r %= p;
+        }
+        while (newnum.front() == 0) {
+            newnum.pop_front();
+        }
+        return {newnum, r};
+    }
+    std::vector<uint64_t> tobase(uint64_t newbase) {
+        std::vector<uint64_t> ans;
+        while (num.size() != 0) {
+            auto [q, r] = operator/(newbase);
+            ans.push_back(r);
+            num = std::move(q);
+        }
+        return ans;
+    }
+};
+ 
+ 
+ 
+class Zp {
+public:
+    const uint64_t p;
+    uint64_t n;
+    Zp(uint64_t P, uint64_t N) : p(P), n(N % P) {};
+};
+ 
+Zp operator+(const Zp& a, const Zp& b) {
+    if (a.p != b.p) {
+        throw "cant + with objects in different fields";
+    } else {
+        uint64_t c = a.n + b.n;
+        c -= a.p * (c >= a.p);
+        return {a.p, c};
+    }
+}
+ 
+Zp operator*(const Zp& a, const Zp& b) {
+    if (a.p != b.p) {
+        throw "cant * with objects in different fields";
+    } else {
+        return {a.p, (a.n * b.n) % a.p};
+    }
+}
+ 
+Zp operator-(const Zp& a) {
+    return {a.p, a.p - a.n};
+}
+ 
+Zp operator-(const Zp& a, const Zp& b) {
+    return a + (-b);
+}
+ 
+Zp pow(const Zp& a, int64_t m);
+Zp inv(const Zp& a);
+ 
+Zp pow(const Zp& a, int64_t m) {
+    if (m == 0) {
+        return {a.p, 1};
+    }
+    if (m < 0) {
+        return pow(inv(a), -m);
+    }
+    if (m % 2 == 0) {
+        Zp b = pow(a, m / 2);
+        return b * b;
+    }
+    Zp b = pow(a, (m - 1) / 2);
+    return a * b * b;
+}
+ 
+Zp inv(const Zp& a) {
+    return pow(a, a.p - 2);
+}
+ 
+Zp operator/(const Zp& a, const Zp& b) {
+    return a * inv(b);
+}
+ 
+Zp make_Zp(uint64_t P, int64_t N) {
+    if (N >= 0) {
+        return {P, static_cast<uint64_t>(N % P)};
+    } else {
+        return -Zp{P, static_cast<uint64_t>((-N) % P)};
+    }
+}
+ 
+int char_to_number(char symbol) {
+  if (symbol >= 48 && symbol <= 57)
+    return symbol - 48;
+  if (symbol >= 65 && symbol <= 90)
+    return symbol - 55;
+  if (symbol >= 97 && symbol <= 122)
+    return symbol - 61;
+  if (symbol == 32)
+    return 62;
+  if (symbol == 46)
+    return 63;
+  return 64;
+}
+ 
+Zp to_Zp(char c, uint64_t p) {
+    int n = char_to_number(c);
+    uint64_t bin_n = 0;
+    /*int t = 0;
+    uint64_t k = 1;
+    while (n > 0) {
+        if (n % 2 == 1) {
+            bin_n += 1 << ;
+        }
+        n /= 2;
+        t += 0;
+        k *= 2;
+    }*/
+    return {p, bin_n};
+}
+ 
+std::pair<int64_t, int64_t> Al_Gamal_Code(const Zp& g, const Zp& k, const Zp& h) {
+    int64_t b = std::rand() % h.p;
+    //std::cout << b << " RANDOM CODE " << std::endl;
+    //int64_t b = 37;
+    //std::cout << "Code called, rnd number is :" << b << " and message is ";
+    return {pow(g, b).n, (pow(k, b) * h).n};
+}
+ 
+int le(int n) {
+    int a = n / 8;
+    int b = n % 8;
+    return a + 8 * b;
+}
+ 
+uint64_t le(uint64_t p, uint64_t msg) {
+    return 0;
+}
+ 
+int main()
+{
+    uint64_t p;
+    uint64_t G;
+    uint64_t K;
+    std::cin >> p >> G >> K;
+    Zp g = {p, G};
+    Zp k = {p, K};
+    char c;
+    infnum m({});
+    std::string s;
+    std::getline(std::cin, s);
+    std::getline(std::cin, s);
+    for (char c : s) {
+        m.append(char_to_number(c));
+    }
+    std::vector<uint64_t> ans = m.tobase(p);
+    /*for (auto it = m.begin() ; it != m.end() ; ++it) {
+        std::cout << *it << ' ';
+    }
+    std::cout << "\n" << ans.size() << " : ";
+    for (auto it = ans.begin() ; it != ans.end() ; ++it) {
+        std::cout << *it << ' ';
+    }
+    */
+    for (auto it = ans.begin() ; it != ans.end() ; ++it) {
+        auto [key, msg] = Al_Gamal_Code(g, k, {p, *it});
+        std::cout << key << ' ' << msg << '\n';
+    }
+    return 0;
+}
