@@ -1,0 +1,594 @@
+#include <iostream>
+#include <string>
+#include <list>
+#include <vector>
+#include <sstream>
+#include <cassert>
+
+template <typename T>
+void print(const std::vector<T>& v) {
+    for (auto it = v.begin() ; it != v.end() ; ++it) {
+        std::cout << *it << ' ';
+    }
+    std::cout << '\n';
+}
+
+int char_to_number(char symbol) {
+  if (symbol >= 48 && symbol <= 57)
+    return symbol - 48;
+  if (symbol >= 65 && symbol <= 90)
+    return symbol - 55;
+  if (symbol >= 97 && symbol <= 122)
+    return symbol - 61;
+  if (symbol == 32)
+    return 62;
+  if (symbol == 46)
+    return 63;
+  return 64;
+}
+
+template<typename T, typename U>
+std::vector<U> to_higher_base(std::vector<T>& num, T base, U newbase, bool mir) {
+    std::vector<U> ans;
+    while (num.size() != 0) {
+        std::vector<T> newnum;
+        U r = 0;
+        if (mir) {
+            for (auto it = num.rbegin() ; it != num.rend() ; ++it) {
+                r = r * base + *it;
+                U q = r / newbase;
+                if ((q != 0) || (!newnum.empty())) {
+                    newnum.push_back(q);
+                }
+                r %= newbase;
+            }
+        } else {
+            for (auto it = num.begin() ; it != num.end() ; ++it) {
+                r = r * base + *it;
+                U q = r / newbase;
+                if ((q != 0) || (!newnum.empty())) {
+                    newnum.push_back(q);
+                }
+                r %= newbase;
+            }
+        }
+        ans.push_back(r);
+        num = std::move(newnum);
+        mir = false;
+        /*std::cout << "updated num :\n";
+        for (int i = 0 ; i != num.size() ; ++i) {
+            std::cout << num[i] << ' ';
+        }
+        std::cout << '\n';*/
+    }
+    return ans;
+}
+
+template<typename T, typename U> // FIX!!!
+std::vector<U> to_lower_base(std::vector<T>& num, T base, U newbase, bool mir) {
+    std::vector<U> ans;
+    while (num.size() != 0) {
+        std::vector<T> newnum;
+        T r = 0;
+        if (mir) {
+            for (auto it = num.rbegin() ; it != num.rend() ; ++it) {
+                r = r * base + *it;
+                T q = r / newbase;
+                if ((q != 0) || (!newnum.empty())) {
+                    newnum.push_back(q);
+                }
+                r %= newbase;
+            }
+        } else {
+            for (auto it = num.begin() ; it != num.end() ; ++it) {
+                r = r * base + *it;
+                T q = r / newbase;
+                if ((q != 0) || (!newnum.empty())) {
+                    newnum.push_back(q);
+                }
+                r %= newbase;
+            }
+        }
+        ans.push_back(r);
+        num = std::move(newnum);
+        mir = false;
+    }
+    return ans;
+
+}
+class Galois_Field;
+class Al_Gamal_Encoder;
+class P_Field;
+std::pair<std::vector<uint64_t>, std::vector<uint64_t>> Extended_Euclid(std::vector<uint64_t> a, std::vector<uint64_t> b, const Galois_Field& GF);
+std::pair<uint64_t, uint64_t> Extended_Euclid(uint64_t a, uint64_t b, const P_Field& Zp);
+
+class P_Field {
+private:
+    uint64_t p;
+public:
+    P_Field(uint64_t P) : p(P) {}
+    /*std::pair<uint64_t, uint64_t> divide_with_remainder(uint64_t x, uint64_t y) const { // dont worry about it;
+        return {(x / y), (x % y)};
+    }*/
+    uint64_t sum(uint64_t x, uint64_t y) const {
+        uint64_t s = x + y;
+        return (s >= p) ? (s - p) : s;
+    }
+    uint64_t minus(uint64_t x) const {
+        return (x > 0) ? (p - x) : x;
+    }
+    uint64_t substract(uint64_t x, uint64_t y) const {
+        return sum(x, minus(y));
+    }
+    uint64_t prod(uint64_t x, uint64_t y) const {
+        return (x * y) % p;
+    }
+    uint64_t inv(uint64_t x) const {
+        auto [a, b] = Extended_Euclid(p, x, *this); ///REDO COMPLETELY
+        return b;
+    }
+    uint64_t pow(uint64_t x, int64_t n) const {
+        if (n < 0) {
+            return pow(inv(x), (-n));
+        }
+        if (n == 0) {
+            return 1;
+        }
+        if (n % 2 == 0) {
+            uint64_t t = pow(x, n / 2);
+            return prod(t, t);
+        }
+        uint64_t t = pow(x, (n - 1) / 2);
+        return prod(prod(t, t), x);
+    }
+    /*uint64_t operator()(uint64_t x) const {
+        return (x < 0) ? ((-x) % p) : (x % p);
+    }*/
+    uint64_t zero() const {
+        return 0;
+    }
+    uint64_t one() const {
+        return 1;
+    }
+};
+
+std::pair<uint64_t, uint64_t> Extended_Euclid(uint64_t a, uint64_t b, const P_Field& Zp) {
+/// b must be NON ZERO!
+    bool rev = (a < b);
+    if (rev) {
+        std::swap(a, b);
+    }
+    uint64_t a_a = 1; uint64_t a_b = 0;
+    uint64_t b_a = 0; uint64_t b_b = 1;
+    while (b != 0) {
+        uint64_t q = a / b; uint64_t r = a % b;
+        uint64_t a_r = Zp.substract(a_a, Zp.prod(q, a_b));
+        uint64_t b_r = Zp.substract(b_a, Zp.prod(q, b_b));
+        a = b; a_a = a_b; b_a = b_b;
+        b = r; a_b = a_r; b_b = b_r;
+    }
+    if (rev) {
+        return {b_a, a_a};
+    } else {
+        return {a_a, b_a};
+    }
+}
+
+class Polynomial {
+public:
+    const std::vector<uint64_t>* pol;
+    Polynomial(const std::vector<uint64_t>* v) : pol(v) {}
+    uint64_t operator[](int i) const {
+        return (pol->size() > i) ? (*pol)[i] : 0;
+    }
+};
+
+class Zp_Polynomials_Field {
+private:
+    P_Field Zp;
+public:
+    Zp_Polynomials_Field(uint64_t p) : Zp(p) {}
+    std::vector<uint64_t> sum(const std::vector<uint64_t>& a, const std::vector<uint64_t>& b) const { ///size = max size
+        int n = std::max(a.size(), b.size());
+        Polynomial pa(&a);
+        Polynomial pb(&b);
+        std::vector<uint64_t> ans(n);
+        for (int i = 0 ; i != n ; ++i) {
+            ans[i] = Zp.sum(pa[i], pb[i]);
+        }
+        return ans;
+    }
+    std::vector<uint64_t> minus(const std::vector<uint64_t>& a) const { ///size = size
+        int n = a.size();
+        Polynomial pa(&a);
+        std::vector<uint64_t> ans(n);
+        for (int i = 0 ; i != n ; ++i) {
+            ans[i] = Zp.minus(pa[i]);
+        }
+        return ans;
+    }
+    std::vector<uint64_t> substract(const std::vector<uint64_t>& a, const std::vector<uint64_t>& b) const { /// size = max size;
+        int n = std::max(a.size(), b.size());
+        Polynomial pa(&a);
+        Polynomial pb(&b);
+        std::vector<uint64_t> ans(n);
+        for (int i = 0 ; i != n ; ++i) {
+            ans[i] = Zp.substract(pa[i], pb[i]);
+        }
+        return ans;
+    }
+    std::vector<uint64_t> prod(uint64_t a, const std::vector<uint64_t>& v) const { /// size = size;
+        int n = v.size();
+        std::vector<uint64_t> ans(n);
+        for (int i = 0 ; i != n ; ++i) {
+            ans[i] = Zp.prod(a, v[i]);
+        }
+        return ans;
+    }
+    //must be nonempty
+    std::vector<uint64_t> prod(const std::vector<uint64_t>& a, const std::vector<uint64_t>& b) const { /// size = sum of sizes - 1;
+        int n = a.size(); int m = b.size();
+        int k = n + m - 1;
+        std::vector<uint64_t> ans(k, 0);
+        Polynomial pa(&a);
+        Polynomial pb(&b);
+        for (int i = 0 ; i != k ; ++i) {
+            for (int j = 0 ; j != i + 1 ; ++j) {
+                ans[i] = Zp.sum(ans[i], Zp.prod(pa[j], pb[i - j]));
+            }
+        }
+        return ans;
+    }
+    //a and b must be non empty and have correct values; and b must be nonzero;
+    std::pair<std::vector<uint64_t>, std::vector<uint64_t>> divide_with_remainder(std::vector<uint64_t> a, std::vector<uint64_t> b, bool is_smaller) const {
+        ///REDO COMPLETELY : Edit :Done
+        //size = b.size();
+        int deg_b = b.size() - 1;
+        int deg_a = a.size() - 1;
+        while ((deg_b != 0) && (b[deg_b] == 0)) {
+            --deg_b;
+        }
+        std::vector<uint64_t> q(a.size(), 0);
+        //q must has any sufficiently big size >= deg_a - deg_b + 1, 0;
+        if (deg_b == 0) {
+            std::vector<uint64_t> r(b.size() - is_smaller, 0);
+            return {prod(Zp.inv(b[0]), a), r};
+        }
+        uint64_t B = Zp.inv(b[deg_b]);
+        for (; deg_a >= deg_b ; --deg_a) {
+            uint64_t A = Zp.prod(a[deg_a], B);
+            q[deg_a - deg_b] = A;
+            for (int i = deg_a ; i != deg_a - deg_b - 1 ; --i) {
+                a[i] = Zp.substract(a[i], Zp.prod(A, b[i - deg_a + deg_b]));
+            }
+        }
+        while (a.size() > b.size() - is_smaller) {
+            a.pop_back();
+        }
+        return {q, a};
+        ///THIS IS BAD
+        /*while (!b.empty() && (b.back() == 0)) {
+            b.pop_back();
+        }
+        if (a.size() < b.size()) {
+            return {{}, a};
+        }
+        int n = b.size() - 1;
+        std::vector<uint64_t> q(a.size() - b.size() + 1, 0);
+        uint64_t t = Zp.inv(b[n]);
+        while (a.size() >= b.size()) {
+            q[a.size() - b.size()] = Zp.prod(a[a.size() - 1], t);
+            for (int i = 0 ; i != n + 1 ; ++i) {
+                a[a.size() - 1 - i] = Zp.substract(a[a.size() - 1 - i], Zp.prod(q[a.size() - b.size()], b[n - i]));
+            }
+            a.pop_back();
+            //std::cout << "POP \n";
+        }
+        return {q, a};
+        */
+    }
+    const P_Field& sub_field() const {
+        return Zp;
+    }
+};
+
+class Galois_Field {
+private:
+    Zp_Polynomials_Field Zp_x;
+    std::vector<uint64_t> Fnull;
+    int n;
+public:
+    Galois_Field(uint64_t p, const std::vector<uint64_t>& v) : Zp_x(p), Fnull(v), n(Fnull.size() - 1) {}
+    Galois_Field(uint64_t p, std::vector<uint64_t>&& v) : Zp_x(p), Fnull(std::move(v)), n(Fnull.size() - 1) {}
+    std::vector<uint64_t> sum(const std::vector<uint64_t>& a, const std::vector<uint64_t>& b) const {
+        return Zp_x.sum(a, b);
+    }
+    std::vector<uint64_t> minus(const std::vector<uint64_t>& a) const {
+        return Zp_x.minus(a);
+    }
+    std::vector<uint64_t> substract(const std::vector<uint64_t>& a, const std::vector<uint64_t>& b) const {
+        return Zp_x.substract(a, b);
+    }
+    std::vector<uint64_t> prod(uint64_t a, const std::vector<uint64_t>& v) const {
+        return Zp_x.prod(a, v);
+    }
+    /// a, b has size n;
+    std::vector<uint64_t> prod(const std::vector<uint64_t>& a, const std::vector<uint64_t>& b) const {
+        std::vector<uint64_t> tmp = Zp_x.divide_with_remainder(Zp_x.prod(a, b), Fnull, true).second;
+        return tmp;
+    }
+    std::vector<uint64_t> inv(const std::vector<uint64_t>& x) const {
+        auto [a, b] = Extended_Euclid(Fnull, x, *this);
+        return b;
+    }
+    std::vector<uint64_t> zero() const {
+        std::vector<uint64_t> ans(n, 0);
+        return ans;
+    }
+    std::vector<uint64_t> one() const {
+        std::vector<uint64_t> ans(n, 0);
+        ans[0] = 1;
+        return ans;
+    }
+    std::vector<uint64_t> pow(const std::vector<uint64_t>& x, int64_t m) const { ///require inv and prod;
+        //std::cout << "calculating " << x[0] << " ^ " << m << "...\n";
+        if (m < 0) {
+            //std::cout << m << " is negative \n";
+            return pow(inv(x), (-m));
+        }
+        if (m == 0) {
+            //std::cout << m << " = 0\n";
+            return one();
+        }
+        if (m % 2 == 0) {
+            //std::cout << m << " is even\n";
+            std::vector<uint64_t> tmp = pow(x, m / 2);
+            return prod(tmp, tmp);
+        } else {
+            //std::cout << m << " is odd\n";
+            std::vector<uint64_t> tmp = pow(x, (m - 1) / 2);
+            return prod(x, prod(tmp, tmp));
+        }
+    }
+    /*std::pair<std::vector<uint64_t>, std::vector<uint64_t>> divide_with_remainder(std::vector<uint64_t> a, std::vector<uint64_t> b) const {
+        return Zp_x.divide_with_remainder(a, b);
+    }*/
+    const P_Field& sub_field() const {
+        return Zp_x.sub_field();
+    }
+    const Zp_Polynomials_Field& sub_ring() const {
+        return Zp_x;
+    }
+    const std::vector<uint64_t>& reduct_pol() const {
+        return Fnull;
+    }
+    /*bool less(const std::vector<uint64_t>& a, const std::vector<uint64_t>& b) const {
+        int n = a.size() - 1;
+        int m = b.size() - 1;
+        while ((n > 0) && (a[n] == 0)) {
+            --n;
+        }
+        while ((m > 0) && (b[m] == 0)) {
+            --m;
+        }
+        return (n < m);
+    }*/
+};
+
+/// a, b must be non empty
+std::pair<std::vector<uint64_t>, std::vector<uint64_t>> Extended_Euclid(std::vector<uint64_t> a, std::vector<uint64_t> b, const Galois_Field& GF) {
+    int deg_a = a.size() - 1;
+    int deg_b = b.size() - 1;
+    while ((deg_a != 0) && (a[deg_a] == 0)) {
+        --deg_a;
+    }
+    bool rev = (deg_a < deg_b);
+    std::vector<uint64_t> a0 = a;
+    std::vector<uint64_t> b0 = b;
+    if (rev) {
+        std::swap(a0, b0);
+        std::swap(a, b);
+        std::swap(deg_a, deg_b);
+    }
+    std::vector<uint64_t> a_a = GF.one();  std::vector<uint64_t> a_b = GF.zero();
+    std::vector<uint64_t> b_a = GF.zero(); std::vector<uint64_t> b_b = GF.one();
+    while (b != GF.zero()) {
+        auto [q, r] = GF.sub_ring().divide_with_remainder(a, b, false);
+        std::vector<uint64_t> tmp = GF.sum(GF.prod(q, b), r);
+        //assert((tmp == a) || ((tmp == GF.zero()) && (a == GF.reduct_pol())));
+        std::vector<uint64_t> a_r = GF.substract(a_a, GF.prod(q, a_b));
+        std::vector<uint64_t> b_r = GF.substract(b_a, GF.prod(q, b_b));
+        //assert(r == GF.sum(GF.prod(a0, a_r), GF.prod(b0, b_r)));
+        a = b; a_a = a_b ; b_a = b_b;
+        b = r; a_b = a_r ; b_b = b_r;
+        //std::cout << "now a = "; print(a);
+        //std::cout << "now b = "; print(b);
+    }
+    int t = deg_b;
+    while ((t != 0) && (a[t] == 0)) {
+        --t;
+    }
+    //std::cout << "in the end : "; print(a);
+    //std::cout << t << ' ' << a[t] << '\n';
+    uint64_t A = GF.sub_field().inv(a[t]);
+    //std::cout << "INV of " << a[t] << " is " << A << '\n';
+    a_a = GF.prod(A, a_a);
+    b_a = GF.prod(A, b_a);
+    if (rev) {
+        return {b_a, a_a};
+    } else {
+        return {a_a, b_a};
+    }
+}
+
+/// THIS IS BAD DONT UNCOMMENT!
+/*
+void Extended_Euclid(const std::vector<uint64_t>& a, const std::vector<uint64_t>& b, const Galois_Field& F, std::vector<uint64_t>& out1, std::vector<uint64_t>& out2) {
+    bool w = !(F.less(a, b));
+    std::vector<uint64_t> r0 = w ? a : b;
+    std::vector<uint64_t> r1 = w ? b : a;
+    std::vector<uint64_t> x0 = F.one(); std::vector<uint64_t> x1 = F.zero(); std::vector<uint64_t> y0 = F.zero(); std::vector<uint64_t> y1 = F.one();
+    while (!r0.empty() && (r0.back() == 0)) {
+        r0.pop_back();
+    }
+    while (!r1.empty() && (r1.back() == 0)) {
+        r1.pop_back();
+    }
+    while (r1.size() != 0) {
+        auto [q, r] = F.divide_with_remainder(r0, r1);
+        std::vector<uint64_t> x2 = F.substract(x0, F.prod(q, x1));
+        std::vector<uint64_t> y2 = F.substract(y0, F.prod(q, y1));
+        r0 = r1; r1 = r;
+        x0 = x1; x1 = x2;
+        y0 = y1; y1 = y2;
+    }
+    uint64_t d = F.sub_field().inv(r0[0]);
+    x0 = F.prod(d, x0);
+    y0 = F.prod(d, y0);
+    if (w) {
+        out1 = x0;
+        out2 = y0;
+    } else {
+        out1 = y0;
+        out2 = x0;
+    }
+}
+
+void Extended_Euclid(uint64_t a, uint64_t b, const P_Field& F, uint64_t& out1, uint64_t& out2) {
+    bool w = (a >= b);
+    uint64_t r0 = w ? a : b;
+    uint64_t r1 = w ? b : a;
+    uint64_t x0 = F.one(); uint64_t x1 = F.zero(); uint64_t y0 = F.zero(); uint64_t y1 = F.one();
+    while (r1 != F.zero()) {
+        auto [q, r] = F.divide_with_remainder(r0, r1);
+        uint64_t x2 = F.substract(x0, F.prod(q, x1));
+        uint64_t y2 = F.substract(y0, F.prod(q, y1));
+        r0 = r1; r1 = r;
+        x0 = x1; x1 = x2;
+        y0 = y1; y1 = y2;
+    }
+    if (w) {
+        out1 = x0;
+        out2 = y0;
+    } else {
+        out1 = y0;
+        out2 = x0;
+    }
+}
+*/
+
+class Al_Gamal_Encoder {
+private:
+    Galois_Field Fq;
+    std::vector<uint64_t> g;
+    std::vector<uint64_t> k;
+public:
+    Al_Gamal_Encoder(const Galois_Field& F, const std::vector<uint64_t>& G, const std::vector<uint64_t>& K) : Fq(F), g(G), k(K) {}
+    void Encode(const std::vector<uint64_t>& m, std::vector<uint64_t>& key, std::vector<uint64_t>& mes) {
+        int64_t b = std::rand();
+        //int64_t b = 42;
+        key = Fq.pow(g, b);
+        mes = Fq.prod(m, Fq.pow(k, b));
+        ///must work if prod & pow work in Fq;
+    }
+};
+
+void read_by_modulo(std::vector<uint64_t>& v, uint64_t p) {
+    std::string s;
+    std::getline(std::cin, s);
+    std::stringstream ss(s);
+    int64_t x;
+    while (ss >> x) {
+        v.push_back((x < 0) ? (x + p) : x);
+    }
+}
+
+int main()
+{
+    uint64_t p;
+    std::cin >> p;
+    P_Field Zp(p);
+    Zp_Polynomials_Field Zp_x(p);
+
+    std::string s;
+    std::getline(std::cin, s);
+
+    std::vector<uint64_t> Fnull;
+    read_by_modulo(Fnull, p);
+    int n = Fnull.size() - 1;
+    Fnull = Zp_x.prod(Zp.inv(Fnull[n]), Fnull);
+
+    std::vector<uint64_t> g;
+    read_by_modulo(g, p);
+    g = Zp_x.divide_with_remainder(g, Fnull, true).second;
+
+    std::vector<uint64_t> k;
+    read_by_modulo(k, p);
+    k = Zp_x.divide_with_remainder(k, Fnull, true).second;
+
+    char c;
+    std::vector<int> m;
+    std::getline(std::cin, s);
+    for (char c : s) {
+        m.push_back(char_to_number(c));
+    }
+    std::vector<uint64_t> ans = to_higher_base<int, uint64_t>(m, 64, p, true);
+    if (ans.size() % n != 0) {
+        ans.resize(ans.size() + n - (ans.size() % n), 0);
+    }
+    Galois_Field Galfield(p, Fnull);
+    Al_Gamal_Encoder encoder(Galfield, g, k);
+    int t = ans.size() / n;
+    for (int i = 0 ; i != t ; ++i) {
+        std::vector<uint64_t> a(ans.begin() + i * n, ans.begin() + (i + 1) * n);
+        std::vector<uint64_t> key(n);
+        std::vector<uint64_t> mes(n);
+        encoder.Encode(a, key, mes);
+        print(key);
+        print(mes);
+    }/*
+    uint64_t p = 131;
+    std::vector<uint64_t> Fnull{109, 15, 92, 1};
+    std::vector<uint64_t> key = {36, 124, 119};
+    std::vector<uint64_t> mes = {117, 90, 124};
+    int64_t k = 5;
+    std::vector<uint64_t> o = {};
+    P_Field Zp(p);
+    Galois_Field GF(p, Fnull);
+    Zp_Polynomials_Field PR(p);*/
+    /*std::vector<uint64_t> v0 = key;
+    for (int i = 1 ; i != k; ++i) {
+        v0 = GF.prod(v0, key);
+    }
+    for (int i = 0 ; i != v0.size() ; ++i) {
+        std::cout << v0[i] << ' ';
+    }
+    std::cout << '\n';
+    std::vector<uint64_t> v00 = GF.pow(key, k);
+    for (int i = 0 ; i != v00.size() ; ++i) {
+        std::cout << v00[i] << ' ';
+    }
+    std::cout << '\n';
+    std::vector<uint64_t> v1 = GF.inv(GF.pow(key, k));
+    for (int i = 0 ; i != v1.size() ; ++i) {
+        std::cout << v1[i] << ' ';
+    }
+    std::cout << '\n';
+    std::vector<uint64_t> v2 = GF.pow(key, -k);
+    for (int i = 0 ; i != v2.size() ; ++i) {
+        std::cout << v2[i] << ' ';
+    }
+    std::cout << '\n';
+    std::vector<uint64_t> v3 = GF.prod(v0, v1);
+    print(v3);
+    std::vector<uint64_t> v4 = GF.prod(v0, v2);
+    print(v4);
+    std::vector<uint64_t> v = GF.prod(mes, GF.pow(key, -k));
+    for (int i = 0 ; i != v.size() ; ++i) {
+        std::cout << v[i] << ' ';
+    }
+    std::cout << '\n';
+    print(GF.prod(GF.inv(key), key));
+    print(GF.inv(key));*/
+    return 0;
+}
