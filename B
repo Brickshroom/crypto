@@ -1,0 +1,209 @@
+#include <iostream>
+#include <string>
+#include <list>
+#include <vector>
+
+using uint = unsigned;
+
+template <typename T, typename U>
+class infnum{
+private:
+    T base = 64;
+    std::list<T> num = {};
+public:
+    infnum(std::list<T>&& a) : num(std::move(a)) {};
+    infnum(T b, std::list<T>&& a) : base(b), num(std::move(a)) {};
+    infnum(T b) : base(b) {};
+    void push_front(T t) {
+        num.push_front(t);
+    }
+    void push_back(T t) {
+        num.push_back(t);
+    }
+    int len() {
+        return num.size();
+    }
+    typename std::list<T>::const_iterator begin() {
+        return num.cbegin();
+    }
+    typename std::list<T>::const_iterator end() {
+        return num.cend();
+    }
+    std::pair<std::list<T>, U> operator/(U p) {
+        std::list<T> newnum;
+        T r = 0;
+        while (num.size() != 0) {
+            r = r * base + num.front();
+            num.pop_front();
+            newnum.push_back(r / p);
+            r %= p;
+        }
+        while (newnum.front() == 0) {
+            newnum.pop_front();
+        }
+        return {newnum, static_cast<U>(r)};
+    }
+    std::vector<U> tobase(U newbase) {
+        std::vector<U> ans;
+        while (num.size() != 0) {
+            auto [q, r] = operator/(newbase);
+            ans.push_back(r);
+            num = std::move(q);
+        }
+        return ans;
+    }
+};
+
+
+
+class Zp {
+public:
+    const uint64_t p;
+    uint64_t n;
+    Zp(uint64_t P, uint64_t N) : p(P), n(N % P) {};
+};
+
+Zp operator+(const Zp& a, const Zp& b) {
+    if (a.p != b.p) {
+        throw "cant + with objects in different fields";
+    } else {
+        uint64_t c = a.n + b.n;
+        c -= a.p * (c >= a.p);
+        return {a.p, c};
+    }
+}
+
+Zp operator*(const Zp& a, const Zp& b) {
+    if (a.p != b.p) {
+        throw "cant * with objects in different fields";
+    } else {
+        return {a.p, (a.n * b.n) % a.p};
+    }
+}
+
+Zp operator-(const Zp& a) {
+    return {a.p, a.p - a.n};
+}
+
+Zp operator-(const Zp& a, const Zp& b) {
+    return a + (-b);
+}
+
+Zp pow(const Zp& a, int64_t m);
+Zp inv(const Zp& a);
+
+Zp pow(const Zp& a, int64_t m) {
+    if (m == 0) {
+        return {a.p, 1};
+    }
+    if (m < 0) {
+        return pow(inv(a), -m);
+    }
+    if (m % 2 == 0) {
+        Zp b = pow(a, m / 2);
+        return b * b;
+    }
+    Zp b = pow(a, (m - 1) / 2);
+    return a * b * b;
+}
+
+Zp inv(const Zp& a) {
+    return pow(a, a.p - 2);
+}
+
+Zp operator/(const Zp& a, const Zp& b) {
+    return a * inv(b);
+}
+
+Zp make_Zp(uint64_t P, int64_t N) {
+    if (N >= 0) {
+        return {P, static_cast<uint64_t>(N % P)};
+    } else {
+        return -Zp{P, static_cast<uint64_t>((-N) % P)};
+    }
+}
+
+int char_to_number(char symbol) {
+  if (symbol >= 48 && symbol <= 57)
+    return symbol - 48;
+  if (symbol >= 65 && symbol <= 90)
+    return symbol - 55;
+  if (symbol >= 97 && symbol <= 122)
+    return symbol - 61;
+  if (symbol == 32)
+    return 62;
+  if (symbol == 46)
+    return 63;
+  return 64;
+}
+
+char number_to_char(uint num) {
+    if (num >= 0 && num <= 9)
+        return num + 48;
+    if (num >= 10 && num <= 35)
+        return num + 55;
+    if (num >= 36 && num <= 61)
+        return num + 61;
+    if (num == 62)
+        return 32;
+    if (num == 63)
+        return 46;
+    return '\n';
+}
+
+Zp to_Zp(char c, uint64_t p) {
+    int n = char_to_number(c);
+    uint64_t bin_n = 0;
+    /*int t = 0;
+    uint64_t k = 1;
+    while (n > 0) {
+        if (n % 2 == 1) {
+            bin_n += 1 << ;
+        }
+        n /= 2;
+        t += 0;
+        k *= 2;
+    }*/
+    return {p, bin_n};
+}
+
+std::pair<int64_t, int64_t> Al_Gamal_Code(const Zp& g, const Zp& k, const Zp& h) {
+    int64_t b = std::rand() % h.p;
+    //std::cout << b << " RANDOM CODE " << std::endl;
+    //int64_t b = 37;
+    //std::cout << "Code called, rnd number is :" << b << " and message is ";
+    return {pow(g, b).n, (pow(k, b) * h).n};
+}
+
+#include <sstream>
+
+int main()
+{
+    uint64_t p;
+    uint64_t k;
+    std::cin >> p >> k;
+    infnum<uint64_t, uint> m({p});
+    std::string s;
+    std::getline(std::cin, s);
+    while(std::getline(std::cin, s)) {
+        std::stringstream ss(s);
+        uint64_t x; uint64_t y;
+        ss >> x >> y;
+        //std::cout << x << ' ' << y << '\n';
+        m.push_front((Zp{p, y}/pow(Zp{p, x}, k)).n);
+    }
+    /*std::cout << "that was \n";
+    for (auto it = m.begin() ; it != m.end() ; ++it) {
+        std::cout << *it << ' ';
+    }*/
+    std::vector<uint> ans = m.tobase(64);
+    /*std::cout << "\n" << ans.size() << " : ";
+    for (auto it = ans.begin() ; it != ans.end() ; ++it) {
+        std::cout << *it << ' ';
+    }
+    std::cout << '\n';*/
+    for (auto it = ans.begin() ; it != ans.end() ; ++it) {
+        std::cout << number_to_char(*it);
+    }
+    return 0;
+}
