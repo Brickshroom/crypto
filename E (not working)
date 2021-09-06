@@ -1,0 +1,713 @@
+#include <iostream>
+#include <string>
+#include <list>
+#include <vector>
+#include <sstream>
+// #include <boost/multiprecision/cpp_int.hpp>
+
+template <typename T>
+void Print(const std::vector<T>& v) {
+    for (auto it = v.begin() ; it != v.end() ; ++it) {
+        std::cout << *it << ' ';
+    }
+    std::cout << '\n';
+}
+// EXCLUSIVE TO E or F
+int char_to_number(char symbol) {
+  if (symbol >= 48 && symbol <= 57)
+    return symbol - 48;
+  if (symbol >= 65 && symbol <= 90)
+    return symbol - 55;
+  if (symbol >= 97 && symbol <= 122)
+    return symbol - 61;
+  if (symbol == 95)
+    return 62;
+  if (symbol == 46)
+    return 63;
+  return 64;
+}
+// EXCLUSIVE TO E or F
+char number_to_char(int num) {
+    if (num >= 0 && num <= 9)
+        return num + 48;
+    if (num >= 10 && num <= 35)
+        return num + 55;
+    if (num >= 36 && num <= 61)
+        return num + 61;
+    if (num == 62)
+        return 95;
+    if (num == 63)
+        return 46;
+    return '\n';
+}
+
+// each digit must be integer in [0...base) and base > 0
+// base must be (sufficient big??) power of 2 no higher than 32.
+
+
+template<typename T, typename U>
+std::vector<U> to_higher_base(std::vector<T>& num, T base, U newbase, bool mir) {
+    std::vector<U> ans;
+    while (num.size() != 0) {
+        std::vector<T> newnum;
+        U r = 0;
+        if (mir) {
+            for (auto it = num.rbegin() ; it != num.rend() ; ++it) {
+                r = r * base + *it;
+                U q = r / newbase;
+                if ((q != 0) || (!newnum.empty())) {
+                    newnum.push_back(q);
+                }
+                r %= newbase;
+            }
+        } else {
+            for (auto it = num.begin() ; it != num.end() ; ++it) {
+                r = r * base + *it;
+                U q = r / newbase;
+                if ((q != 0) || (!newnum.empty())) {
+                    newnum.push_back(q);
+                }
+                r %= newbase;
+            }
+        }
+        ans.push_back(r);
+        num = std::move(newnum);
+        mir = false;
+    }
+    return ans;
+}
+
+template<typename T, typename U>
+std::vector<U> to_lower_base(std::vector<T>& num, T base, U newbase, bool mir) {
+    std::vector<U> ans;
+    while (num.size() != 0) {
+        std::vector<T> newnum;
+        T r = 0;
+        if (mir) {
+            for (auto it = num.rbegin() ; it != num.rend() ; ++it) {
+                r = r * base + *it;
+                T q = r / newbase;
+                if ((q != 0) || (!newnum.empty())) {
+                    newnum.push_back(q);
+                }
+                r %= newbase;
+            }
+        } else {
+            for (auto it = num.begin() ; it != num.end() ; ++it) {
+                r = r * base + *it;
+                T q = r / newbase;
+                if ((q != 0) || (!newnum.empty())) {
+                    newnum.push_back(q);
+                }
+                r %= newbase;
+            }
+        }
+        ans.push_back(r);
+        num = std::move(newnum);
+        mir = false;
+    }
+    return ans;
+}
+
+std::string prettify(uint64_t a) {
+    std::string s;
+    std::stringstream ss;
+    ss << a;
+    ss >> s;
+    return std::string(9 - s.size(), '0') + s;
+}
+
+namespace intf {
+    const uint64_t base = 4294967296; // 2 ^ 32
+    const int lg = 32; // log_2(base)
+    // m - 1 = degree of a. n - 1 = degree of b.
+    std::vector<uint64_t> tointf(std::string s) {
+        uint64_t old_base = 1000000000;
+        int t = s.size() % 9;
+        std::vector<uint64_t> ten_based(s.size() / 9 + 1);
+        std::string st0 = std::string(9 - t, '0') + s.substr(0, t);
+        std::stringstream ss0(st0);
+        ss0 >> ten_based[0];
+        int i = 0;
+        while (t != s.size()) {
+            std::string st = s.substr(t, 9);
+            t += 9;
+            std::stringstream ss(st);
+            ss >> ten_based[++i];
+        }
+        std::vector<uint64_t> ans = to_higher_base<uint64_t, uint64_t>(ten_based, old_base, base, false);
+        return ans;
+    }
+    void print(std::vector<uint64_t> a) {
+        uint64_t new_base = static_cast<uint64_t>(1000000000);
+        std::vector<uint64_t> b = to_lower_base<uint64_t, uint64_t>(a, intf::base, new_base, true);
+        std::cout << b[b.size() - 1];
+        for (int i = b.size() - 2 ; i != -1 ; --i) {
+            std::cout << prettify(b[i]);
+        }
+    }
+    int deg(const std::vector<uint64_t>& a) {
+        int n = a.size() - 1;
+        while ((n != 0) && (a[n] == 0)) {
+            --n;
+        }
+        return n;
+    }
+    bool is_equal(const std::vector<uint64_t>& a, const std::vector<uint64_t>& b) {
+        int m = a.size() - 1;
+        int n = b.size() - 1;
+        while ((m != 0) && (a[m] == 0)) {--m; }
+        while ((n != 0) && (b[n] == 0)) {--n; }
+        if (m != n) {
+            return false;
+        }
+        for (int i = m ; i != -1 ; --i) {
+            if (a[i] != b[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+    bool is_less(const std::vector<uint64_t>::const_iterator it_a, std::vector<uint64_t>::const_iterator it_b, int n) {
+        for (int i = n - 1 ; i != -1 ; --i) {
+            if (*(it_a + i) < *(it_b + i)) {
+                return true;
+            }
+            if (*(it_a + i) > *(it_b + i)) {
+                return false;
+            }
+        }
+        return false;
+    }
+    bool is_less(const std::vector<uint64_t>& a, const std::vector<uint64_t>& b) {
+        int m = a.size() - 1;
+        int n = b.size() - 1;
+        while ((m != 0) && (a[m] == 0)) {--m; }
+        while ((n != 0) && (b[n] == 0)) {--n; }
+        if (m > n) {
+            return false;
+        }
+        if (m < n) {
+            return true;
+        }
+        for (int i = m ; i != -1 ; --i) {
+            if (a[i] > b[i]) {
+                return false;
+            }
+            if (a[i] < b[i]) {
+                return true;
+            }
+        }
+        return false;
+    }
+    std::vector<uint64_t> sum(const std::vector<uint64_t>& a, const std::vector<uint64_t>& b) {
+        // return vector of a size m or m + 1 if m is not sufficient, where m = max(a.size(), b.size())
+        int sz = std::max(a.size(), b.size());
+        std::vector<uint64_t> s(sz + 1);
+        const std::vector<uint64_t>& c = (a.size() < b.size()) ? b : a;
+        uint64_t r = 0;
+        int min_sz = std::min(a.size(), b.size());
+        for (int i = 0 ; i != min_sz ; ++i) {
+            s[i] = a[i] + b[i] + r;
+            r = (s[i] >= base);
+            s[i] -= base * r;
+        }
+        for (int i = min_sz ; i != sz ; ++i) {
+            s[i] = c[i] + r;
+            r = (s[i] >= base);
+            s[i] -= base * r;
+        }
+        s[sz] = r;
+        if (s[sz] == 0) {
+            s.pop_back();
+        }
+        return s;
+    }
+    std::vector<uint64_t> sum(const std::vector<uint64_t>& a, uint64_t b) {
+        // return vector of a size m or m + 1 if m is not sufficient, where m = max(a.size(), b.size())
+        std::vector<uint64_t> s(a.size() + 1);
+        s[a.size()] = 0;
+        for (int i = 0 ; i != a.size() ; ++i) {
+            s[i] = a[i];
+        }
+        for (int i = 0 ; i != a.size() + 1 ; ++i) {
+            s[i] += b;
+            b = (s[i] >= base);
+            s[i] -= (base * b);
+        }
+        if (s[a.size()] == 0) {
+            s.pop_back();
+        }
+        return s;
+    }
+    std::vector<uint64_t> substract(const std::vector<uint64_t>& a, const std::vector<uint64_t>& b) {
+        // a must be no less than b. O(sz)
+        // return vector of a size max(a.size(), b.size())
+        std::vector<uint64_t> sub(a.size());
+        for (int i = 0 ; i != b.size() ; ++i) {
+            sub[i] = a[i] + base - b[i];
+        }
+        for (int i = b.size() ; i != a.size() ; ++i) {
+            sub[i] = a[i] + base;
+        }
+        uint64_t r = 0;
+        for (int i = 0 ; i != a.size() ; ++i) {
+            sub[i] -= r;
+            r = (sub[i] < base);
+            sub[i] -= (static_cast<uint64_t>(1) - r) * base;
+        }
+        return sub;
+    }
+    void substract(std::vector<uint64_t>::iterator it_r, std::vector<uint64_t>::const_iterator it_b, int n) {
+        // a must be no less than b. O(sz)
+        // return vector of a size max(a.size(), b.size())
+        for (int i = 0 ; i != n ; ++i) {
+            *(it_r + i) = *(it_r + i) + base - *(it_b + i);
+        }
+        uint64_t r = 0;
+        for (int i = 0 ; i != n ; ++i) {
+            *(it_r + i) -= r;
+            r = (*(it_r + i) < base);
+            *(it_r + i) = *(it_r + i) - (static_cast<uint64_t>(1) - r) * base;
+        }
+    }
+    std::vector<uint64_t> prod(uint64_t c, const std::vector<uint64_t>& a) {
+        // returns vector of a size a.size() if possible or a.size() + 1 if not.
+        std::vector<uint64_t> pr(a.size() + 1);
+        pr[a.size()] = 0;
+        for (int i = 0 ; i != a.size() ; ++i) {
+            pr[i] = c * a[i];
+        }
+        for (int i = 0 ; i != a.size() ; ++i) {
+            pr[i + 1] += pr[i] / base;
+            pr[i] %= base;
+        }
+        if (pr.back() == 0) {
+            pr.pop_back();
+        }
+        return pr;
+    }
+    std::vector<uint64_t> prod(const std::vector<uint64_t>& a, const std::vector<uint64_t>& b) {
+        // returns vector of a size a.size() + b.size().
+        int sz = a.size() + b.size();
+        std::vector<uint64_t> pr(sz, 0);
+        for (int i = 0 ; i != a.size() ; ++i) {
+            for (int j = 0 ; j != b.size() ; ++j) {
+                uint64_t t = a[i] * b[j];
+                pr[i + j + 1] += t / base;
+                pr[i + j] += t % base;
+            }
+        }
+        for (int i = 1 ; i < sz - 1 ; ++i) {
+            pr[i + 1] += pr[i] / base;
+            pr[i] %= base;
+        }
+        return pr;
+    }
+    std::vector<uint64_t> divide(const std::vector<uint64_t>& a, uint64_t b) {
+        // b must be less than base;
+        // return [a / b] of a size a.size();
+        int sz = a.size();
+        uint64_t r = 0;
+        std::vector<uint64_t> q(sz);
+        for (int i = sz - 1 ; i != -1 ; --i) {
+            r = r * base + a[i];
+            q[i] = r / b;
+            r %= b;
+        }
+        return q;
+    }
+    // i must be in range [0 ... min(log_2(base), 32)]
+    // returns vector of a size a.size() + 1
+    std::vector<uint64_t> bitwise_left_shift(const std::vector<uint64_t>& a, int i) {
+        uint64_t head = ((static_cast<uint64_t>(1) << i) - static_cast<uint64_t>(1)) << (lg - i);
+        uint64_t tale = (static_cast<uint64_t>(1) << (lg - i)) - static_cast<uint64_t>(1);
+        std::vector<uint64_t> shifted(a.size() + 1, 0);
+        uint64_t r = 0;
+        for (int j = 0 ; j != a.size() ; ++j) {
+            shifted[j] = ((a[j] & tale) << i) | r;
+            r = (a[j] & head) >> (lg - i);
+        }
+        shifted[a.size()] = r;
+        return shifted;
+    }
+    // i must be in range [0 ... min(log_2(base), 32)]
+    // returns vector of a size
+    std::vector<uint64_t> bitwise_right_shift(const std::vector<uint64_t>& a, int i) {
+        uint64_t head = ((static_cast<uint64_t>(1) << (lg - i)) - static_cast<uint64_t>(1)) << i;
+        uint64_t tale = (static_cast<uint64_t>(1) << i) - static_cast<uint64_t>(1);
+        std::vector<uint64_t> shifted(a.size());
+        uint64_t r = 0;
+        for (int j = a.size() - 1 ; j != -1 ; --j) {
+            shifted[j] = ((a[j] & head) >> i) | r;
+            r = (a[j] & tale) << (lg - i);
+        }
+        return shifted;
+    }
+    // b must be non zero.
+    std::pair<std::vector<uint64_t>, std::vector<uint64_t>> Schoolbook_division_algorithm(const std::vector<uint64_t>& a, const std::vector<uint64_t>& b) {
+        int m = a.size();
+        int n = b.size();
+        while ((m != 1) && (a[m - 1] == 0)) {
+            --m;
+        }
+        while ((n != 1) && (b[n - 1] == 0)) {
+            --n;
+        }
+        std::vector<uint64_t> r = a;
+        std::vector<uint64_t> q(a.size(), 0);
+        while (m >= n) {
+            if (!is_less(r.cbegin() + m - n, b.cbegin(), n)) {
+                q[m - n] = 1;
+                substract(r.begin() + m - n, b.cbegin(), n);
+                while ((m != 1) && (r[m - 1] == 0)) {
+                    --m;
+                }
+                continue;
+            }
+            if (m > n) {
+                uint64_t qu = std::min((r[m - 1] * base + r[m - 2]) / b[n - 1], base - static_cast<uint64_t>(1));
+                std::vector<uint64_t> T = prod(qu, b);
+                for (int i = 0 ; i != 2 ; ++i) {
+                    if (is_less(r.begin() + m - n - 1, T.begin(), n + 1)) {
+                        --qu;
+                        T = substract(T, b);
+                    }
+                }
+                q[m - n - 1] = qu;
+                substract(r.begin() + m - n - 1, T.begin(), n + 1);
+                while ((m != 1) && (r[m - 1] == 0)) {
+                    --m;
+                }
+                continue;
+            }
+            break;
+        }
+        r.resize(b.size(), 0);
+        return {q, r};
+    }
+    std::pair<std::vector<uint64_t>, std::vector<uint64_t>> divide_with_remainder(const std::vector<uint64_t>& a, const std::vector<uint64_t>& b) {
+        // b must be non zero!
+        // returns vectors q of a size a.size() and r of a size b.size()
+        // Schoolbook division algorithm.
+        int t = b.size() - 1;
+        while (b[t] == 0) {
+            --t;
+        }
+        if (b[t] < (base >> 1)) {
+            uint64_t k = (base >> 1);
+            int i = 0;
+            while ((k >> i) > b[t]) {
+                ++i;
+            }
+            auto [q, r] = Schoolbook_division_algorithm(bitwise_left_shift(a, i), bitwise_left_shift(b, i));
+            r = bitwise_right_shift(r, i);
+            q.resize(a.size(), 0);
+            r.resize(b.size(), 0);
+            return {q, r};
+        } else {
+            return Schoolbook_division_algorithm(a, b);
+        }
+    }
+    std::vector<uint64_t> inc(const std::vector<uint64_t>& a) {
+        std::vector<uint64_t> b = a;
+        int m = 0;
+        while (m != a.size()) {
+            ++b[m];
+            if (b[m] != base) {
+                break;
+            }
+            b[m] = 0;
+            ++m;
+        }
+        if (m == b.size()) {
+            b.push_back(1);
+        }
+        return b;
+    }
+    uint64_t random_digit() {
+        //int a = std::rand(); int b = std::rand();
+        return static_cast<uint64_t>(65536) * static_cast<uint64_t>(std::rand() % 65536) + static_cast<uint64_t>(std::rand() % 65536);
+    }
+    std::vector<uint64_t> random(const std::vector<uint64_t>& o) {
+        std::vector<uint64_t> v(intf::deg(o) + 1);
+        for (int i = 0 ; i != v.size() ; ++i) {
+            v[i] = intf::random_digit();
+        }
+        return intf::divide_with_remainder(v, o).second;
+    }
+    //translates number from 10 based system to intf
+    //assuming base = 2^32 ;
+    // makes size multiple of 8;
+    class P_Field;
+    std::pair<std::vector<uint64_t>, std::vector<uint64_t>> Extended_Euclid(std::vector<uint64_t> a, std::vector<uint64_t> b, const intf::P_Field& Zp);
+    class P_Field {
+    private:
+        std::vector<uint64_t> p;
+    public:
+        P_Field(std::vector<uint64_t> P) : p(std::move(P)) {}
+        std::vector<uint64_t> sum(const std::vector<uint64_t>& x, const std::vector<uint64_t>& y) const {
+            std::vector<uint64_t> s = intf::sum(x, y);
+            if (!intf::is_less(s, p)) {
+                intf::substract(s, p);
+                s.resize(p.size(), 0);
+            }
+            return s;
+        }
+        std::vector<uint64_t> minus(const std::vector<uint64_t>& x) const {
+            return (x[intf::deg(x)] == 0) ? x : intf::substract(p, x);
+        }
+        std::vector<uint64_t> substract(const std::vector<uint64_t>& x, const std::vector<uint64_t>& y) const {
+            return this->sum(x, minus(y));
+        }
+        std::vector<uint64_t> prod(uint64_t c, const std::vector<uint64_t>& a) const {
+            return intf::divide_with_remainder(intf::prod(c, a), p).second;
+        }
+        std::vector<uint64_t> prod(const std::vector<uint64_t>& x, const std::vector<uint64_t>& y) const {
+            return intf::divide_with_remainder(intf::prod(x, y), p).second;
+        }
+        std::vector<uint64_t> inv(const std::vector<uint64_t>& x) const {
+            return intf::Extended_Euclid(p, x, *this).second;
+        }
+        std::vector<uint64_t> pow(const std::vector<uint64_t>& x, const std::vector<uint64_t>& n) const {
+            /*if (n < 0) {
+                return pow(inv(x), (-n));
+            }*/
+            if (n[intf::deg(n)] == 0) {
+                std::vector<uint64_t> eye(x.size(), 0);
+                eye[0] = 1;
+                return eye;
+            }
+            if ((n[0] & static_cast<uint64_t>(1)) == 0) {
+                std::vector<uint64_t> t = this->pow(x, intf::bitwise_right_shift(n, 1));
+                return this->prod(t, t);
+            }
+            std::vector<uint64_t> t = this->pow(x, intf::bitwise_right_shift(n, 1));
+            return this->prod(this->prod(t, t), x);
+        }
+        std::vector<uint64_t> zero() const {
+            std::vector<uint64_t> tmp(p.size(), 0);
+            return tmp;
+        }
+        std::vector<uint64_t> one() const {
+            std::vector<uint64_t> tmp(p.size(), 0);
+            tmp[0] = 1;
+            return tmp;
+        }
+        std::vector<uint64_t> sqrt(const std::vector<uint64_t>& a) const {
+            /// assuming p = 3 (mod 4)
+            return this->pow(a, intf::bitwise_right_shift(intf::inc(p), 2));
+        }
+    };
+
+    std::pair<std::vector<uint64_t>, std::vector<uint64_t>> Extended_Euclid(std::vector<uint64_t> a, std::vector<uint64_t> b, const intf::P_Field& Zp) {
+    /// b must be NON ZERO!
+        bool rev = intf::is_less(a, b);
+        if (rev) {
+            std::swap(a, b);
+        }
+        int sz = std::max(a.size(), b.size());
+        std::vector<uint64_t> a_a(sz, 0); a_a[0] = 1; std::vector<uint64_t> b_a(sz, 0);
+        std::vector<uint64_t> a_b(sz, 0); std::vector<uint64_t> b_b(sz, 0); b_b[0] = 1;
+        int m = b.size();
+        while ((m != 1) && (b[m - 1] == 0)) {
+            --m;
+        }
+        while ((m != 1) || (b[0] != 0)) {
+            auto [q, r] = intf::divide_with_remainder(a, b);
+            std::vector<uint64_t> a_r = Zp.substract(a_a, Zp.prod(q, a_b));
+            std::vector<uint64_t> b_r = Zp.substract(b_a, Zp.prod(q, b_b));
+            a = std::move(b); a_a = std::move(a_b); b_a = std::move(b_b);
+            b = std::move(r); a_b = std::move(a_r); b_b = std::move(b_r);
+            while ((m != 1) && (b[m - 1] == 0)) {
+                --m;
+            }
+        }
+        if (rev) {
+            return {b_a, a_a};
+        } else {
+            return {a_a, b_a};
+        }
+    }
+};
+
+class Eliptic_Curve_Group {
+public:
+    const intf::P_Field Zp;
+    const std::vector<uint64_t> a;
+    const std::vector<uint64_t> b;
+    Eliptic_Curve_Group(const intf::P_Field& F, const std::vector<uint64_t>& A, const std::vector<uint64_t>& B) : Zp(F), a(A), b(B) {}
+    std::vector<uint64_t> y(const std::vector<uint64_t>& x) {
+        if (x.size() == 0) {
+            return {};
+        }
+        return Zp.sqrt(Zp.sum(Zp.sum(Zp.prod(Zp.prod(x, x), x), Zp.prod(a, x)), b));
+    }
+    void print(const std::pair<std::vector<uint64_t>, std::vector<uint64_t>>& P) {
+        if (P.first.size() == 0) {
+            std::cout << 'Z' << '\n';
+            return;
+        }
+        intf::print(P.first);
+        std::cout << ' ';
+        intf::print(P.second);
+        std::cout << '\n';
+    }
+    std::pair<std::vector<uint64_t>, std::vector<uint64_t>> sum(const std::pair<std::vector<uint64_t>, std::vector<uint64_t>>& P, const std::pair<std::vector<uint64_t>, std::vector<uint64_t>>& Q) {
+        if (P.first.size() == 0) {
+            //std::cout << "P = 0" << std::endl;
+            return Q;
+        }
+        if (Q.first.size() == 0) {
+            //std::cout << "Q = 0" << std::endl;
+            return P;
+        }
+        std::vector<uint64_t> m;
+        if (intf::is_equal(P.first, Q.first)) {
+            if (intf::is_equal(P.second, Zp.minus(Q.second))) {
+                return {{}, {}};
+            }
+            m = Zp.prod(
+                        Zp.sum(Zp.prod(static_cast<uint64_t>(3), Zp.prod(P.first, P.first)), a),
+                        Zp.inv(Zp.prod(static_cast<uint64_t>(2), P.second)));
+        } else {
+            m = Zp.prod(Zp.substract(P.second, Q.second), Zp.inv(Zp.substract(P.first, Q.first)));
+        }
+        std::vector<uint64_t> x_R = Zp.substract(Zp.prod(m, m), Zp.sum(P.first, Q.first));
+        return {x_R, Zp.substract(Zp.prod(m, Zp.substract(Q.first, x_R)), Q.second)};
+    }
+    std::pair<std::vector<uint64_t>, std::vector<uint64_t>> minus(const std::pair<std::vector<uint64_t>, std::vector<uint64_t>>& P) {
+        if (P.first.size() == 0) {
+            return {{}, {}};
+        }
+        return {P.first, Zp.minus(P.second)};
+    }
+    std::pair<std::vector<uint64_t>, std::vector<uint64_t>> substract(const std::pair<std::vector<uint64_t>, std::vector<uint64_t>>& a, const std::pair<std::vector<uint64_t>, std::vector<uint64_t>>& b) {
+        return this->sum(a, this->minus(b));
+    }
+    std::pair<std::vector<uint64_t>, std::vector<uint64_t>> prod(const std::vector<uint64_t>& n, const std::pair<std::vector<uint64_t>, std::vector<uint64_t>>& P) {
+        if (n[intf::deg(n)] == 0) {
+            return {{}, {}};
+        }
+        std::pair<std::vector<uint64_t>, std::vector<uint64_t>> t = this->prod(intf::bitwise_right_shift(n, 1), P);
+        if ((n[0] & static_cast<uint64_t>(1)) == 0) {
+            return this->sum(t, t);
+        }
+        return this->sum(P, this->sum(t, t));
+    }
+};
+
+class Al_Gamal_Encoder {
+    Eliptic_Curve_Group E;
+    std::pair<std::vector<uint64_t>, std::vector<uint64_t>> g; // generator of sub group
+    std::pair<std::vector<uint64_t>, std::vector<uint64_t>> k; // public key
+    std::vector<uint64_t> ord;
+public:
+    Al_Gamal_Encoder(const Eliptic_Curve_Group& EF, const std::pair<std::vector<uint64_t>, std::vector<uint64_t>>& G,
+                     const std::pair<std::vector<uint64_t>, std::vector<uint64_t>>& K, const std::vector<uint64_t>& ORD) : E(EF), g(G), k(K), ord(ORD) {}
+    void Encode(const std::pair<std::vector<uint64_t>, std::vector<uint64_t>>& m,
+                std::pair<std::vector<uint64_t>, std::vector<uint64_t>>& key, std::pair<std::vector<uint64_t>, std::vector<uint64_t>>& mes) {
+        std::vector<uint64_t> b = intf::random(ord); //this time random enough
+        intf::print(b);
+        std::cout << std::endl;
+        key = E.prod(b, g);
+        mes = E.sum(m, E.prod(b, k));
+    }
+};
+
+bool read_by_modulo(std::vector<uint64_t>& v, uint64_t p) {
+    std::string s;
+    if (!std::getline(std::cin, s)) {
+        return false;
+    }
+    v.clear();
+    std::stringstream ss(s);
+    int64_t x;
+    while (ss >> x) {
+        v.push_back((x < 0) ? (x + p) : x);
+    }
+    return true;
+}
+
+int main()
+{
+    /*
+    uint64_t p;
+    std::cin >> p;
+    P_Field Zp(p);
+    Zp_Polynomials_Field Zp_x(p);
+
+    std::string s;
+    std::getline(std::cin, s);
+
+    std::vector<uint64_t> Fnull;
+    read_by_modulo(Fnull, p);
+    int n = Fnull.size() - 1;
+    Fnull = Zp_x.prod(Zp.inv(Fnull[n]), Fnull);
+    Galois_Field Galfield(p, Fnull);
+
+    int64_t k;
+    std::cin >> k;
+    std::getline(std::cin, s);
+
+    std::vector<uint64_t> p_endian;
+    std::vector<uint64_t> key;
+    std::vector<uint64_t> mes;
+    while (read_by_modulo(key, p)) {
+        key = Zp_x.divide_with_remainder(key, Fnull, true).second;
+        read_by_modulo(mes, p);
+        mes = Zp_x.divide_with_remainder(mes, Fnull, true).second;
+        std::vector<uint64_t> m = Galfield.div(mes, Galfield.pow(key, k));
+        for (int i = 0 ; i != n ; ++i) {
+            p_endian.push_back(m[i]);
+        }
+    }
+    std::vector<int> m_endian = to_lower_base<uint64_t, int>(p_endian, p, 64, true);
+    for (int i = 0 ; i != m_endian.size() ; ++i) {
+        std::cout << number_to_char(m_endian[i]);
+    }*/
+    std::vector<uint64_t> p = {4294967295, 4294967295, 4294967295, 0, 0, 0, 1, 4294967295};
+    intf::P_Field Zp(p);
+    std::vector<uint64_t> a = Zp.minus({3, 0, 0, 0, 0, 0, 0, 0});
+
+    std::vector<uint64_t> b = intf::tointf("41058363725152142129326129780047268409114441015993725554835256314039467401291");
+    b.resize(p.size(), 0);
+    std::vector<uint64_t> x_g = intf::tointf("48439561293906451759052585252797914202762949526041747995844080717082404635286");
+    x_g.resize(p.size(), 0);
+    std::vector<uint64_t> y_g = intf::tointf("36134250956749795798585127919587881956611106672985015071877198253568414405109");
+    y_g.resize(p.size(), 0);
+    std::pair<std::vector<uint64_t>, std::vector<uint64_t>> g = {x_g, y_g};
+    std::vector<uint64_t> ord = intf::tointf("115792089210356248762697446949407573529996955224135760342422259061068512044369");
+    Eliptic_Curve_Group E(Zp, a, b);
+    std::vector<uint64_t> x_k;
+    std::vector<uint64_t> y_k;
+    std::string s_k;
+    std::cin >> s_k;
+    x_k = intf::tointf(s_k);
+    std::cin >> s_k;
+    y_k = intf::tointf(s_k);
+    std::pair<std::vector<uint64_t>, std::vector<uint64_t>> k = {x_k, y_k};
+    //E.print(k);
+    Al_Gamal_Encoder encoder(E, g, k, ord);
+    //intf::print(ord);
+    //std::cout << "\n" << "115792089210356248762697446949407573529996955224135760342422259061068512044369";
+    int n;
+    std::cin >> n;
+    for (int i = 0 ; i != n ; ++i) {
+        std::string s;
+        std::cin >> s;
+        std::vector<int> v(s.size());
+        for (int i = 0 ; i != s.size() ; ++i) {
+            v[i] = char_to_number(s[s.size() - 1 - i]);
+        }
+        std::vector<uint64_t> x = intf::divide_with_remainder(to_higher_base<int, uint64_t>(v, 64, intf::base, false), p).second;
+        std::vector<uint64_t> y = E.y(x);
+        y.resize(p.size(), 0);
+        std::pair<std::vector<uint64_t>, std::vector<uint64_t>> key;
+        std::pair<std::vector<uint64_t>, std::vector<uint64_t>> mes;
+        encoder.Encode({x, y}, key, mes);
+        E.print(key);
+        E.print(mes);
+    }
+    return 0;
+}
